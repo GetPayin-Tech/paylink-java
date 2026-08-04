@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.getpayin.paylink</groupId>
+        <artifactId>paylink-parent</artifactId>
+        <version>0.1.0</version>
+    </parent>
+
+    <artifactId>paylink-spring-boot-starter</artifactId>
+    <name>PayLink Java SDK (Spring Boot starter)</name>
+    <description>Spring Boot auto-configuration for the PayLink SDK: binds paylink.* properties and exposes a PaylinkClient bean.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.getpayin.paylink</groupId>
+            <artifactId>paylink-core</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+            <version>${spring.boot.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <version>${spring.boot.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <version>${spring.boot.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>
