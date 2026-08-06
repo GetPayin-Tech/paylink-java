@@ -33,7 +33,7 @@ Ships a **Spring Boot starter** for one-line dependency injection.
 <dependency>
   <groupId>com.getpayin.paylink</groupId>
   <artifactId>paylink-core</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
 </dependency>
 ```
 
@@ -43,16 +43,16 @@ Spring Boot apps — use the starter instead (it pulls in the core):
 <dependency>
   <groupId>com.getpayin.paylink</groupId>
   <artifactId>paylink-spring-boot-starter</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
 </dependency>
 ```
 
 **Gradle**:
 
 ```groovy
-implementation 'com.getpayin.paylink:paylink-core:0.1.0'
+implementation 'com.getpayin.paylink:paylink-core:0.2.0'
 // or, for Spring Boot:
-implementation 'com.getpayin.paylink:paylink-spring-boot-starter:0.1.0'
+implementation 'com.getpayin.paylink:paylink-spring-boot-starter:0.2.0'
 ```
 
 ## Quick start
@@ -76,6 +76,17 @@ CreateInvoiceResult checkout = paylink.invoices().create(
 
 // Redirect the payer to the hosted checkout:
 response.sendRedirect(checkout.checkoutUrl());
+```
+
+For an **embedded checkout**, pass `.iframe(true)` and render `checkout.checkoutUrl()`
+inside an `<iframe>` instead of redirecting:
+
+```java
+CreateInvoiceResult checkout = paylink.invoices().create(
+        new CreateInvoiceParams()
+                .firstName("John").lastName("Doe").email("john@example.com")
+                .orderTitle("Gold Plan").orderAmount("250.00").currency("USD")
+                .iframe(true));
 ```
 
 Both credentials are issued in the PayLink dashboard under **Settings → Payment
