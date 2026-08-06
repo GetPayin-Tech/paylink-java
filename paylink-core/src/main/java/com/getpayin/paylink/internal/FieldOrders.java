@@ -6,7 +6,8 @@ import java.util.List;
  * The signed-field registry. Each entry lists a request's fields in the EXACT order
  * the server concatenates them when it rebuilds the HMAC signature (the FormRequest
  * {@code rules()} order, minus {@code token}/{@code signature}, and minus
- * {@code payment_mode} which is sent but not signed). Keep it in lockstep with the
+ * unsigned fields such as {@code payment_mode} and {@code iframe} which are sent but not
+ * signed). Keep it in lockstep with the
  * server FormRequests under {@code app/Http/Requests/Application/ExternalPaymentIntegration}.
  */
 public final class FieldOrders {
@@ -30,7 +31,8 @@ public final class FieldOrders {
                     FieldSpec.of("redirection_url"),
                     FieldSpec.of("webhook_url"),
                     FieldSpec.of("order_details"),
-                    FieldSpec.unsigned("payment_mode")),
+                    FieldSpec.unsigned("payment_mode"),
+                    FieldSpec.unsigned("iframe")),
             false);
 
     public static final EndpointSpec PAYMENT_VOID = new EndpointSpec(

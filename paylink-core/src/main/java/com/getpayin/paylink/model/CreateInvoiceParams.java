@@ -83,6 +83,11 @@ public final class CreateInvoiceParams {
         return this;
     }
 
+    public CreateInvoiceParams iframe(Boolean value) {
+        fields.put("iframe", value);
+        return this;
+    }
+
     /** Internal: the accumulated snake_case fields. */
     public Map<String, Object> fields() {
         return fields;
