@@ -10,6 +10,7 @@ import com.getpayin.paylink.exception.PaylinkException;
 import com.getpayin.paylink.exception.PaylinkSignatureException;
 import com.getpayin.paylink.internal.Signature;
 import com.getpayin.paylink.webhook.WebhookEvent;
+import com.getpayin.paylink.webhook.WebhookEventType;
 import com.getpayin.paylink.webhook.Webhooks;
 import com.google.gson.JsonObject;
 import java.util.ArrayList;
@@ -104,18 +105,95 @@ class WebhookTest {
         assertThrows(PaylinkException.class, () -> webhooks.verify("{not json"));
     }
 
+    /**
+     * Signs a payload the way the server signs one: the always-signed four, then whichever
+     * optional block the payload carries, each gated on its own leading field so that
+     * {@code external_reference} is signed at the position the block that introduced it gives it.
+     */
+    @Test
+    void verifiesCardTokenCreatedAndExposesTheSavedCard() {
+        JsonObject payload = cardTokenCreated();
+        sign(payload, HASH);
+
+        WebhookEvent event = webhooks.verify(payload.toString());
+        assertEquals(WebhookEventType.CARD_TOKEN_CREATED, event.event());
+        assertEquals("TKZ-4f21", event.tokenizationId());
+        assertEquals("CRD-9a07", event.cardToken());
+        assertEquals("VISA", event.cardBrand());
+        assertEquals("4242", event.cardLast4());
+        assertEquals("12", event.cardExpMonth());
+        assertEquals("2029", event.cardExpYear());
+        assertEquals("cust-42", event.externalReference());
+    }
+
+    @Test
+    void verifiesCardTokenFailedWhichCarriesNoCard() {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("event", "card_token.failed");
+        payload.addProperty("success", 0);
+        payload.addProperty("invoice_id", 7782);
+        payload.addProperty("invoice_status", "UNPAID");
+        payload.addProperty("message", "The card could not be stored for future payments.");
+        payload.addProperty("tokenization_id", "TKZ-4f22");
+        payload.addProperty("external_reference", "cust-43");
+        sign(payload, HASH);
+
+        WebhookEvent event = webhooks.verify(payload.toString());
+        assertEquals(WebhookEventType.CARD_TOKEN_FAILED, event.event());
+        assertFalse(event.success());
+        assertEquals("TKZ-4f22", event.tokenizationId());
+        assertNull(event.cardToken());
+    }
+
+    @Test
+    void rejectsATamperedCard() {
+        JsonObject payload = cardTokenCreated();
+        sign(payload, HASH);
+        payload.addProperty("card_last4", "1111");
+
+        assertFalse(webhooks.isValid(payload.toString()));
+    }
+
     private static void sign(JsonObject payload, String hashToken) {
-        List<String> values = new ArrayList<>();
-        values.add(wire(payload, "success"));
-        values.add(wire(payload, "invoice_id"));
-        values.add(wire(payload, "invoice_status"));
-        values.add(wire(payload, "message"));
-        for (String key : List.of("mandate_id", "external_reference", "subscription_status")) {
-            if (payload.has(key)) {
-                values.add(wire(payload, key));
+        List<String> keys = new ArrayList<>(List.of("success", "invoice_id", "invoice_status", "message"));
+        List<List<String>> blocks = List.of(
+                List.of("mandate_id", "external_reference", "subscription_status"),
+                List.of("tokenization_id", "external_reference", "card_token", "card_brand",
+                        "card_last4", "card_exp_month", "card_exp_year"));
+
+        for (List<String> block : blocks) {
+            if (!payload.has(block.get(0))) {
+                continue;
+            }
+            for (String key : block) {
+                if (payload.has(key) && !keys.contains(key)) {
+                    keys.add(key);
+                }
             }
         }
+
+        List<String> values = new ArrayList<>();
+        for (String key : keys) {
+            values.add(wire(payload, key));
+        }
         payload.addProperty("signature", Signature.build(values, hashToken));
+    }
+
+    private static JsonObject cardTokenCreated() {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("event", "card_token.created");
+        payload.addProperty("success", 1);
+        payload.addProperty("invoice_id", 7781);
+        payload.addProperty("invoice_status", "REVERSED");
+        payload.addProperty("message", "Card stored for future payments.");
+        payload.addProperty("tokenization_id", "TKZ-4f21");
+        payload.addProperty("external_reference", "cust-42");
+        payload.addProperty("card_token", "CRD-9a07");
+        payload.addProperty("card_brand", "VISA");
+        payload.addProperty("card_last4", "4242");
+        payload.addProperty("card_exp_month", "12");
+        payload.addProperty("card_exp_year", "2029");
+        return payload;
     }
 
     private static String wire(JsonObject payload, String name) {

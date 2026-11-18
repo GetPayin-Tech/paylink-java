@@ -16,15 +16,32 @@ import java.util.Map;
 /**
  * Default webhook verifier. Recomputes the signature over the concatenated values of an
  * ordered subset of the payload, exactly as the server signs it: {@code success},
- * {@code invoice_id}, {@code invoice_status}, {@code message}, plus (for subscription
- * events only, detected by presence) {@code mandate_id}, {@code external_reference},
- * {@code subscription_status}. The signature travels in the payload body.
+ * {@code invoice_id}, {@code invoice_status}, {@code message}, then whichever of the two
+ * optional blocks the payload carries — a recurring mandate's fields, or a card-token
+ * event's tokenisation and card. The signature travels in the payload body.
  */
 public final class DefaultWebhooks implements Webhooks {
 
     private static final List<String> ALWAYS_SIGNED = List.of("success", "invoice_id", "invoice_status", "message");
 
-    private static final List<String> OPTIONAL_SIGNED = List.of("mandate_id", "external_reference", "subscription_status");
+    /** The fields a recurring mandate adds, in the order the server adds them. */
+    private static final List<String> MANDATE_SIGNED = List.of("mandate_id", "external_reference", "subscription_status");
+
+    /**
+     * The fields a card-token event adds, in the order the server adds them.
+     *
+     * <p>{@code card_token.created} and {@code card_token.failed} are the only events that carry a
+     * tokenisation, and both are on by default for every integration. The server writes
+     * {@code tokenization_id} and {@code external_reference} first, then the card's details — and
+     * only when the card was actually vaulted, so a failed tokenisation signs the first two alone.
+     *
+     * <p>Order matters because the signature is a separator-less concatenation: on an event with no
+     * mandate, {@code external_reference} is signed AFTER {@code tokenization_id}, not at the
+     * position it holds on a subscription event.
+     */
+    private static final List<String> TOKENIZATION_SIGNED = List.of(
+            "tokenization_id", "external_reference", "card_token", "card_brand", "card_last4",
+            "card_exp_month", "card_exp_year");
 
     private final PaylinkConfig config;
 
@@ -69,15 +86,31 @@ public final class DefaultWebhooks implements Webhooks {
         }
     }
 
+    /**
+     * Rebuilds the expected signature the way the server assembles it.
+     *
+     * <p>{@code PaymentIntegrationWebhookJob} appends a whole block at a time — the mandate fields
+     * when the invoice belongs to one, the tokenisation fields when the event is about a card — and
+     * PHP keeps a key at the position it was first written. A block is therefore gated on its own
+     * leading field rather than on the individual fields inside it: {@code external_reference}
+     * belongs to whichever block introduced it, and is never signed twice.
+     */
     private String computeSignature(JsonObject object, String hashToken) {
-        List<String> values = new ArrayList<>();
-        for (String key : ALWAYS_SIGNED) {
-            values.add(fieldToWire(object, key));
-        }
-        for (String key : OPTIONAL_SIGNED) {
-            if (object.has(key)) {
-                values.add(fieldToWire(object, key));
+        List<String> keys = new ArrayList<>(ALWAYS_SIGNED);
+        for (List<String> block : List.of(MANDATE_SIGNED, TOKENIZATION_SIGNED)) {
+            if (!object.has(block.get(0))) {
+                continue;
             }
+            for (String key : block) {
+                if (object.has(key) && !keys.contains(key)) {
+                    keys.add(key);
+                }
+            }
+        }
+
+        List<String> values = new ArrayList<>();
+        for (String key : keys) {
+            values.add(fieldToWire(object, key));
         }
         return Signature.build(values, hashToken);
     }
@@ -111,7 +144,13 @@ public final class DefaultWebhooks implements Webhooks {
                 Json.strOrNull(object, "external_reference"),
                 Json.strOrNull(object, "subscription_status"),
                 Json.strOrNull(object, "event_triggered_at"),
-                Json.strOrNull(object, "timezone"));
+                Json.strOrNull(object, "timezone"),
+                Json.strOrNull(object, "tokenization_id"),
+                Json.strOrNull(object, "card_token"),
+                Json.strOrNull(object, "card_brand"),
+                Json.strOrNull(object, "card_last4"),
+                Json.strOrNull(object, "card_exp_month"),
+                Json.strOrNull(object, "card_exp_year"));
     }
 
     private JsonObject parse(String payload) {
