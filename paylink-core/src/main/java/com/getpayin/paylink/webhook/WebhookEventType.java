@@ -24,6 +24,8 @@ public final class WebhookEventType {
     public static final String VCC_PAYMENT_FAILED = "vcc.payment_failed";
     public static final String CARD_TOKEN_CHARGE_SUCCEEDED = "card_token.charge_succeeded";
     public static final String CARD_TOKEN_CHARGE_FAILED = "card_token.charge_failed";
+    public static final String CARD_TOKEN_CREATED = "card_token.created";
+    public static final String CARD_TOKEN_FAILED = "card_token.failed";
 
     private WebhookEventType() {
     }
